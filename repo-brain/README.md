@@ -172,13 +172,14 @@ was verified against the live services, not mocked:
 - `langchain-google-genai` returns `.content` as a list of content blocks — use
   `response.text`, don't assume a plain string. (Already handled in `distill_lessons`;
   crew nodes must do the same.)
-- `gemini-2.5-flash` is retired; use `config.GEMINI_MODEL` (`gemini-3.7-flash`
-  verified working), never a hardcoded model name.
+- `gemini-2.5-flash` is retired; use `config.GEMINI_MODEL` (`gemini-3.6-flash`
+  verified working end-to-end), never a hardcoded model name.
 - **The Gemini free tier caps at 20 requests/day *per model*, not just per minute** — one
   full cold run (planner + 3 coder/reviewer rounds + distillation) is ~8 of them, so the
   day's budget is roughly two rehearsals. The daily 429 is unretryable, so `_complete()`
   fails fast on it with a clear message instead of burning 80 s in backoff. The cap being
-  per model is also the escape hatch: `GEMINI_MODEL=gemini-3.6-flash` gets a fresh 20.
+  per model is also the escape hatch: pointing `GEMINI_MODEL` at a neighbouring model
+  (`gemini-3.5-flash`, `gemini-3.7-flash`) gets a fresh 20.
   Runs are checkpointed, so `crew resume <thread_id>` continues one that hit the wall.
 
 ## Layout

@@ -108,7 +108,7 @@ Plan goes to `plans/crew.md`, then implement:
 
 1. `build_graph()` — `StateGraph` over the agreed state dict; all LLM nodes use
    Gemini via `langchain-google-genai` with `config.GEMINI_MODEL` — do NOT hardcode a
-   model name (`gemini-2.5-flash` is retired; `gemini-3.7-flash` is verified working).
+   model name (`gemini-2.5-flash` is retired; `gemini-3.6-flash` is verified working).
    Heads-up: this client returns `.content` as a list of content blocks — use
    `response.text` (or join the text blocks), don't assume a plain string. Nodes:
    - **planner**: LLM turns `task` into a short `plan`.

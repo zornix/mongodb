@@ -134,7 +134,7 @@ def _complete(system: str, user: str) -> str:
             if "PerDay" in err or "per day" in err.lower():
                 raise RuntimeError(
                     f"Gemini daily free-tier quota exhausted for {GEMINI_MODEL}. The cap is "
-                    "per model, so set GEMINI_MODEL to another model (e.g. gemini-3.6-flash) "
+                    "per model, so set GEMINI_MODEL to another model (e.g. gemini-3.5-flash) "
                     "or add billing. The run is checkpointed — `crew resume <thread_id>` "
                     "picks up where it stopped."
                 ) from exc

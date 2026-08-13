@@ -15,7 +15,7 @@ load_dotenv()
 
 MONGODB_URI = os.environ.get("MONGODB_URI", "")
 MONGODB_DB = os.environ.get("MONGODB_DB", "repo_brain")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.7-flash")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")
 # GOOGLE_API_KEY is what langchain-google-genai reads; accept GEMINI_API_KEY as an alias.
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY", "")
 if GOOGLE_API_KEY:
