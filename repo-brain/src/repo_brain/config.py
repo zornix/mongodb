@@ -10,8 +10,9 @@ load_dotenv()
 
 MONGODB_URI = os.environ.get("MONGODB_URI", "")
 MONGODB_DB = os.environ.get("MONGODB_DB", "repo_brain")
-EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
-EMBEDDING_DIMS = 1536
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.7-flash")
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "voyage-3.5-lite")
+EMBEDDING_DIMS = 1024  # baked into the Atlas vector index — change only before setup_indexes.py
 
 LESSONS_COLLECTION = "lessons"
 CHECKPOINTS_COLLECTION = "checkpoints"  # used by langgraph-checkpoint-mongodb
