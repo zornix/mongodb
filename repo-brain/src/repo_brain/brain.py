@@ -25,11 +25,10 @@ from repo_brain.config import (
     EMBEDDING_MODEL,
     GEMINI_MODEL,
     LESSONS_COLLECTION,
+    RUNS_COLLECTION,  # written by crew.run_task, read by stats()
     VECTOR_INDEX_NAME,
     db,
 )
-
-RUNS_COLLECTION = "runs"  # written by crew.run_task, read by stats()
 
 LESSON_TYPES = ("convention", "past_fix", "gotcha")
 

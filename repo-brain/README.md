@@ -19,8 +19,8 @@ lessons before writing** — so run 2 measurably behaves differently than run 1.
 | Lane | Module | State |
 |---|---|---|
 | Brain + MCP (Person 1) | `brain.py`, `mcp_server.py` | ✅ built & verified live (branch `brain`) |
-| Crew (Person 2) | `crew.py` | stub — next up |
-| Demo CLI (Person 3) | `cli.py` | stub |
+| Crew (Person 2) | `crew.py` | ✅ built & verified live (PR #2, merged) |
+| Demo CLI (Person 3) | `cli.py` | ✅ built & verified live (PR #1, merged) |
 
 ## Architecture
 
@@ -90,7 +90,7 @@ The lesson document (also frozen):
 | `checkpoints` | LangGraph `MongoDBSaver` | LangGraph on resume | Full graph state per `thread_id`; enables the kill-and-resume demo. |
 | `runs` | `crew.run_task` (on finish) | `brain.stats` | `{task, cycles}` history — the run-over-run learning curve. |
 
-### 3. The crew — `src/repo_brain/crew.py` *(stub)*
+### 3. The crew — `src/repo_brain/crew.py` *(implemented)*
 
 `StateGraph` over the frozen state dict
 `{task, plan, code, review_feedback, cycles, lessons_used}`:
@@ -106,7 +106,7 @@ its checkpointed node.
 
 ### 4. The surfaces
 
-- **`cli.py`** *(stub)* — `crew run / resume / stats / brain`, Rich-rendered; what the
+- **`cli.py`** *(implemented)* — `crew run / resume / stats / brain`, Rich-rendered; what the
   judges see.
 - **`mcp_server.py`** *(implemented)* — FastMCP over stdio exposing `search_lessons`,
   `add_lesson`, `brain_stats`; each tool is a ~3-line delegate into `brain.py`. Any MCP
@@ -120,7 +120,35 @@ naming). The reviewer enforces these; the point of the demo is that the coder st
 needing to be told. Three of these conventions are seeded as hand-written lessons so
 retrieval works before the first real distillation.
 
-## Recent changes (branch `brain`)
+## Recent changes
+
+### All three lanes merged
+
+PR #2 (crew) merged into `main` on top of PR #1 (CLI) and the `brain` branch. The PR was
+written against the pre-brain stubs, so integration fixed the seams between lanes:
+
+- **Config**: the PR still assumed OpenAI embeddings (`text-embedding-3-small`, 1536
+  dims). Kept the live Voyage settings (1024 dims) — the Atlas index is built for them —
+  and took the PR's `ServerApi("1")`, extra `.env` search paths, and `GEMINI_API_KEY`
+  alias. The crew is Gemini-only now; the Anthropic/OpenAI model fallbacks went with the
+  deps that were already dropped from `pyproject.toml`.
+- **`review_feedback` shape**: the graph keeps only the *current* round in that key (what
+  the coder needs), but the CLI renders one panel per cycle. `run_task()` now returns the
+  full per-cycle list there, matching `fake_state.py`. Before this, the CLI iterated a
+  string and rendered one panel *per character*.
+- **Fake brain removed**: `crew.py`'s canned warm lessons fell back silently on any brain
+  error, which is indistinguishable from a genuine cold run. Retrieval now fails loudly;
+  only `distill_lessons` stays best-effort, so a lesson-writing hiccup can't discard an
+  approved run.
+- **Resume**: `run_task(task=None, thread_id)` is now the supported resume signature
+  (open question 3 in `plans/demo.md`), and an unknown `thread_id` gives a clean CLI
+  error instead of silently rendering fixture data.
+- Verified live end-to-end: warm `/orders` run retrieved 3 lessons (0.74 / 0.73 / 0.68),
+  passed review clean at **0 cycles** with correct `handle_orders_*` names, `api_error`
+  envelope, `*Response` models and `test_orders__*` tests; the run persisted to `runs`;
+  `resume` replayed it from the checkpoint; `stats` and `brain` render real Atlas data.
+
+### The brain lane (`b23d93a`)
 
 The Person 1 lane landed in `b23d93a` — the first real logic in the repo. Every piece
 was verified against the live services, not mocked:
@@ -146,6 +174,12 @@ was verified against the live services, not mocked:
   crew nodes must do the same.)
 - `gemini-2.5-flash` is retired; use `config.GEMINI_MODEL` (`gemini-3.7-flash`
   verified working), never a hardcoded model name.
+- **The Gemini free tier caps at 20 requests/day *per model*, not just per minute** — one
+  full cold run (planner + 3 coder/reviewer rounds + distillation) is ~8 of them, so the
+  day's budget is roughly two rehearsals. The daily 429 is unretryable, so `_complete()`
+  fails fast on it with a clear message instead of burning 80 s in backoff. The cap being
+  per model is also the escape hatch: `GEMINI_MODEL=gemini-3.6-flash` gets a fresh 20.
+  Runs are checkpointed, so `crew resume <thread_id>` continues one that hit the wall.
 
 ## Layout
 
@@ -153,9 +187,9 @@ was verified against the live services, not mocked:
 src/repo_brain/
   config.py      # env + Mongo client — the one place connection details live
   brain.py       # the shared memory layer (lessons: add / distill / search / stats)
-  crew.py        # LangGraph graph: planner -> coder -> reviewer   [stub]
+  crew.py        # LangGraph graph: planner -> coder -> reviewer
   mcp_server.py  # FastMCP server exposing the brain to external agents
-  cli.py         # `crew run "<task>"`, `crew stats`, `crew brain` [stub]
+  cli.py         # `crew run "<task>"`, `crew stats`, `crew brain`
 scripts/
   setup_indexes.py  # creates the Atlas Vector Search index (run once, before demo)
   hello_graph.py    # smoke test: 2-node graph + MongoDB checkpointer round-trip

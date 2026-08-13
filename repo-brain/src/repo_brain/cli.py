@@ -38,6 +38,8 @@ def _resume_task(thread_id: str) -> dict:
         from repo_brain import crew
 
         return crew.run_task(None, thread_id)
+    except ValueError as exc:  # no checkpoint for that thread_id — say so, don't fake it
+        raise typer.BadParameter(str(exc), param_hint="thread_id") from exc
     except (NotImplementedError, ImportError, TypeError):
         return fake_state.RESUME_STATE
 
@@ -78,10 +80,18 @@ def _render_run(state: dict, thread_id: str) -> None:
     for i, feedback in enumerate(state.get("review_feedback") or [], start=1):
         console.print(Panel(feedback, title=f"Review cycle {i}", border_style="red"))
 
-    console.print(Panel(Syntax(state["code"], "diff"), title="Final code", border_style="green"))
+    # Fixtures are diff-shaped; the real crew emits whole files with === FILE: markers.
+    code = state["code"]
+    lexer = "diff" if code.lstrip().startswith(("+", "-", "@@")) else "python"
+    console.print(Panel(Syntax(code, lexer), title="Final code", border_style="green"))
 
     cycles = state["cycles"]
-    if cycles == 0:
+    approved = state.get("approved", True)  # fake_state fixtures predate the flag
+    if not approved:
+        console.print(
+            f"[bold red]Stopped after {cycles} correction cycle(s) — still not approved.[/bold red]"
+        )
+    elif cycles == 0:
         console.print("[bold green]Review passed clean — 0 correction cycles.[/bold green]")
     else:
         console.print(f"[bold]Review passed after {cycles} correction cycle(s).[/bold]")
