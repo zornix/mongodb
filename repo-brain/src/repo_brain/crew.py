@@ -2,6 +2,9 @@
 
 Graph contract (agreed pre-event, implemented at the event):
 - State: {task, plan, code, review_feedback, cycles, lessons_used}
+  - review_feedback: list[str], one entry per correction cycle, in order (empty list
+    once clean) — cli.py renders one panel per cycle, so keep this a list, not a
+    scalar overwritten each loop. See fake_state.py, which fixes this shape.
 - coder node calls brain.search_lessons(task) BEFORE writing — the whole point
 - reviewer node checks demo_target conventions; on violations, loops back to coder
 - on approval, brain.distill_lessons(feedback) persists what was learned

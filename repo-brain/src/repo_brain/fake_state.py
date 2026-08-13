@@ -94,12 +94,14 @@ RESUME_STATE = {
 }
 
 FAKE_STATS = {
-    "tasks": [
+    # Keys match the real brain.stats() shape ("runs" / "total_hits"), not the
+    # "tasks" / "hits_total" names originally assumed in plans/demo.md open question 1.
+    "runs": [
         {"task": COLD_TASK, "cycles": 2},
         {"task": WARM_TASK, "cycles": 0},
     ],
     "lessons_total": 3,
-    "hits_total": 3,
+    "total_hits": 3,
 }
 
 FAKE_LESSONS = [

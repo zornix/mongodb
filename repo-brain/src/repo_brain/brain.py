@@ -140,6 +140,16 @@ def search_lessons(task_description: str, k: int = 5) -> list[dict]:
     return docs
 
 
+def list_lessons(limit: int = 50) -> list[dict]:
+    """All lessons, newest first — no retrieval side effects (unlike search_lessons,
+    this does not bump hit_count). Used by `crew brain` to dump the full list without
+    corrupting the hit-count stat that `stats()` reports."""
+    docs = list(_lessons().find({}, {"embedding": 0}).sort("created_at", -1).limit(limit))
+    for d in docs:
+        d["_id"] = str(d["_id"])
+    return docs
+
+
 def stats() -> dict:
     """Lesson counts, total hits, per-task correction cycles — feeds the demo stats line."""
     by_type = {

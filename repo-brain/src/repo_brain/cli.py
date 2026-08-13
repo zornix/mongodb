@@ -55,7 +55,7 @@ def _brain_lessons() -> list[dict]:
     try:
         from repo_brain import brain
 
-        return brain.search_lessons("", k=50)
+        return brain.list_lessons(limit=50)
     except (NotImplementedError, ImportError):
         return fake_state.FAKE_LESSONS
 
@@ -114,12 +114,12 @@ def stats():
     table = Table(title="Runs")
     table.add_column("Task")
     table.add_column("Cycles", justify="right")
-    for entry in data["tasks"]:
+    for entry in data["runs"]:
         table.add_row(entry["task"], str(entry["cycles"]))
     console.print(table)
 
     console.print(
-        f"\nlessons: {data['lessons_total']}, hits: {data['hits_total']}",
+        f"\nlessons: {data['lessons_total']}, hits: {data['total_hits']}",
         style="bold",
     )
 
