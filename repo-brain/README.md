@@ -172,15 +172,19 @@ was verified against the live services, not mocked:
 - `langchain-google-genai` returns `.content` as a list of content blocks — use
   `response.text`, don't assume a plain string. (Already handled in `distill_lessons`;
   crew nodes must do the same.)
-- `gemini-2.5-flash` is retired; use `config.GEMINI_MODEL` (`gemini-3.6-flash`
-  verified working end-to-end), never a hardcoded model name.
-- **The Gemini free tier caps at 20 requests/day *per model*, not just per minute** — one
-  full cold run (planner + 3 coder/reviewer rounds + distillation) is ~8 of them, so the
-  day's budget is roughly two rehearsals. The daily 429 is unretryable, so `_complete()`
-  fails fast on it with a clear message instead of burning 80 s in backoff. The cap being
-  per model is also the escape hatch: pointing `GEMINI_MODEL` at a neighbouring model
-  (`gemini-3.5-flash`, `gemini-3.7-flash`) gets a fresh 20.
-  Runs are checkpointed, so `crew resume <thread_id>` continues one that hit the wall.
+- Never hardcode a model name — read `config.GEMINI_MODEL`. `gemini-2.5-flash-lite` is
+  listed by the models API but 404s ("no longer available to new users"); the verified
+  working ones on this key are `gemini-3.1-flash-lite` (the default),
+  `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite-preview`, `gemini-3.6-flash` and
+  `gemini-3.5-flash`. `crew model --list` asks the API for the current truth.
+- **The Gemini free tier caps requests/day *per model*, not just per minute** — one full
+  cold run (planner + 3 coder/reviewer rounds + distillation) is ~8 requests and a warm
+  run is 3, so a 20/day model is about one full demo plus a spare. The daily 429 is
+  unretryable, so `_complete()` fails fast on it with a clear message instead of burning
+  80 s in backoff. The cap being per model is the escape hatch: `crew model 3.5` (or
+  `crew run --model ...` for one run) moves to a fresh budget, and runs are checkpointed
+  so `crew resume <thread_id>` continues one that hit the wall without re-spending the
+  calls it already made. Full runbook: [DEMO.md](DEMO.md).
 
 ## Layout
 
@@ -190,10 +194,11 @@ src/repo_brain/
   brain.py       # the shared memory layer (lessons: add / distill / search / stats)
   crew.py        # LangGraph graph: planner -> coder -> reviewer
   mcp_server.py  # FastMCP server exposing the brain to external agents
-  cli.py         # `crew run "<task>"`, `crew stats`, `crew brain`
+  cli.py         # `crew run "<task>"`, `crew stats`, `crew brain`, `crew model`
 scripts/
   setup_indexes.py  # creates the Atlas Vector Search index (run once, before demo)
   hello_graph.py    # smoke test: 2-node graph + MongoDB checkpointer round-trip
+  reset_demo.py     # show / wipe / re-seed the brain between rehearsals
 plans/              # per-lane implementation plans (written before each lane's code)
 demo_target/        # seeded toy FastAPI app the crew operates on (demo fixture)
 ```
@@ -206,6 +211,9 @@ cp .env.example .env          # fill in MONGODB_URI, VOYAGE_API_KEY, GOOGLE_API_
 uv run python scripts/setup_indexes.py
 uv run python scripts/hello_graph.py   # verifies Mongo checkpointing works
 ```
+
+Then follow [DEMO.md](DEMO.md) — the beat-by-beat runbook for driving the demo yourself,
+including the per-model call budget and how to switch models when a daily quota runs out.
 
 See `TEAM_SPLIT.md` for the lane split, frozen contracts, and timeline;
 `DECISIONS.md` for the pre-event scoping decisions.
