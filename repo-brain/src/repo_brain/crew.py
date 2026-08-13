@@ -28,10 +28,9 @@ from langgraph.checkpoint.mongodb import MongoDBSaver
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, Field
 
-from repo_brain import brain
+from repo_brain import brain, config
 from repo_brain.config import (
     CHECKPOINTS_COLLECTION,
-    GEMINI_MODEL,
     GOOGLE_API_KEY,
     MONGODB_DB,
     RUNS_COLLECTION,
@@ -92,15 +91,16 @@ def _gold_standard() -> str:
     )
 
 
-@lru_cache(maxsize=1)
-def _chat_model() -> BaseChatModel:
+@lru_cache(maxsize=4)
+def _chat_model(model: str) -> BaseChatModel:
     # Gemini only: brain.distill_lessons uses the same model, and the Anthropic/OpenAI
     # deps were dropped from pyproject when the brain lane standardised on Gemini.
+    # Keyed by model name so `crew run --model ...` swaps models without a stale cache.
     if not GOOGLE_API_KEY:
         raise RuntimeError("No LLM key set — fill GOOGLE_API_KEY (Gemini) in repo-brain/.env")
     from langchain_google_genai import ChatGoogleGenerativeAI
 
-    return ChatGoogleGenerativeAI(model=GEMINI_MODEL, temperature=0)
+    return ChatGoogleGenerativeAI(model=model, temperature=0)
 
 
 def _text(msg: Any) -> str:
@@ -119,7 +119,8 @@ def _text(msg: Any) -> str:
 
 
 def _complete(system: str, user: str) -> str:
-    llm = _chat_model()
+    model = config.GEMINI_MODEL  # read late: `crew run --model` can swap it at runtime
+    llm = _chat_model(model)
     last_exc: Exception | None = None
     for attempt in range(4):
         try:
@@ -133,10 +134,11 @@ def _complete(system: str, user: str) -> str:
             # Retrying a daily cap just burns 80s before failing — fail fast and say so.
             if "PerDay" in err or "per day" in err.lower():
                 raise RuntimeError(
-                    f"Gemini daily free-tier quota exhausted for {GEMINI_MODEL}. The cap is "
-                    "per model, so set GEMINI_MODEL to another model (e.g. gemini-3.5-flash) "
-                    "or add billing. The run is checkpointed — `crew resume <thread_id>` "
-                    "picks up where it stopped."
+                    f"Gemini daily free-tier quota exhausted for {model}. The cap is per "
+                    "model, so switch to another one (`crew model 3.5`, or "
+                    "`crew resume <thread_id> --model gemini-3.5-flash-lite`) or add "
+                    "billing. The run is checkpointed, so a resume picks up where it "
+                    "stopped rather than re-spending the calls already made."
                 ) from exc
             wait = 8 * (attempt + 1)
             print(f"[crew] LLM rate-limited, retrying in {wait}s ({attempt + 1}/4)")

@@ -4,6 +4,7 @@
     crew resume <thread_id>             # resume a killed run from its Mongo checkpoint
     crew stats                          # run-over-run stats line (the learning curve)
     crew brain                          # dump lessons the crew has accumulated
+    crew model [name]                   # show / switch the Gemini model (daily quota is per model)
 
 Every command tries the real backend (repo_brain.crew / repo_brain.brain) first and
 falls back to repo_brain.fake_state on NotImplementedError/ImportError, so this lane
@@ -18,10 +19,23 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
-from repo_brain import fake_state
+from repo_brain import config, fake_state
 
 app = typer.Typer(help="Repo Brain — a coding crew that never cold-starts")
 console = Console()
+
+MODEL_OPTION = typer.Option(
+    None,
+    "--model",
+    "-m",
+    help="Gemini model for this run (alias ok: 3.1, 3.5). Free-tier quota is per model.",
+)
+
+
+def _use_model(name: str | None) -> None:
+    """Apply a --model override for this process only (nothing written to .env)."""
+    if name:
+        console.print(f"[dim]model: {config.set_gemini_model(name)}[/dim]")
 
 
 def _run_task(task: str, thread_id: str) -> dict:
@@ -100,19 +114,37 @@ def _render_run(state: dict, thread_id: str) -> None:
 
 
 @app.command()
-def run(task: str):
+def run(
+    task: str,
+    model: str | None = MODEL_OPTION,
+    thread_id: str | None = typer.Option(
+        None, "--thread-id", "-t", help="Reuse a known id so a killed run is easy to resume."
+    ),
+):
     """Run a task through the crew and render the full trace."""
-    thread_id = str(uuid4())
+    _use_model(model)
+    thread_id = thread_id or str(uuid4())
+    # Printed up front as well as at the end: the crash demo kills this mid-run, and you
+    # can't resume a thread_id you never saw.
+    console.print(f"[dim]thread_id: {thread_id}[/dim]")
     state = _run_task(task, thread_id)
     _render_run(state, thread_id)
 
 
 @app.command()
-def resume(thread_id: str):
+def resume(thread_id: str, model: str | None = MODEL_OPTION):
     """Resume a killed run from its MongoDB checkpoint."""
+    _use_model(model)
     state = _resume_task(thread_id)
-    resumed_from = state.get("resumed_from", "unknown")
-    console.print(f"[bold magenta]Resumed from: {resumed_from}[/bold magenta]\n")
+    # resumed_from is None when the checkpoint is already complete — that's a free replay
+    # of a finished run (no LLM calls), not a resume. Say which one happened.
+    resumed_from = state.get("resumed_from")
+    if resumed_from:
+        console.print(f"[bold magenta]Resumed from: {resumed_from}[/bold magenta]\n")
+    else:
+        console.print(
+            "[bold magenta]Run already complete — replayed from checkpoint[/bold magenta]\n"
+        )
     _render_run(state, thread_id)
 
 
@@ -146,6 +178,38 @@ def brain():
     for lesson in lessons:
         table.add_row(lesson["type"], lesson["rule"], str(lesson.get("hit_count", 0)))
     console.print(table)
+
+
+@app.command()
+def model(
+    name: str | None = typer.Argument(
+        None, help="Model id or alias (3.1, 3.5). Omit to just show the current one."
+    ),
+    list_available: bool = typer.Option(
+        False, "--list", "-l", help="Ask the API which models this key can call."
+    ),
+):
+    """Show or switch the Gemini model (quota is per model; a cold run costs ~8 calls)."""
+    if name:
+        chosen = config.set_gemini_model(name, persist=True)
+        console.print(
+            f"[bold green]GEMINI_MODEL={chosen}[/bold green] [dim](written to .env)[/dim]"
+        )
+    else:
+        console.print(f"[bold]GEMINI_MODEL={config.GEMINI_MODEL}[/bold]")
+        console.print("[dim]demo models: " + ", ".join(config.DEMO_MODELS) + "[/dim]")
+
+    if list_available:
+        try:
+            names = config.available_models()
+        except Exception as exc:  # network/key problems shouldn't dump a traceback on stage
+            console.print(f"[red]could not list models: {exc}[/red]")
+            raise typer.Exit(1) from exc
+        table = Table(title="Models this key can call")
+        table.add_column("Model")
+        for available in names:
+            table.add_row(available)
+        console.print(table)
 
 
 if __name__ == "__main__":

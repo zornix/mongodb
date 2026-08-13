@@ -20,10 +20,10 @@ from functools import lru_cache
 import voyageai
 from langchain_google_genai import ChatGoogleGenerativeAI
 
+from repo_brain import config
 from repo_brain.config import (
     EMBEDDING_DIMS,
     EMBEDDING_MODEL,
-    GEMINI_MODEL,
     LESSONS_COLLECTION,
     RUNS_COLLECTION,  # written by crew.run_task, read by stats()
     VECTOR_INDEX_NAME,
@@ -90,7 +90,8 @@ def add_lesson(type_: str, rule: str, evidence: str, source_task: str) -> str:
 
 def distill_lessons(review_feedback: str, source_task: str) -> list[str]:
     """LLM call: turn raw reviewer feedback into 0..n durable lessons, store them."""
-    llm = ChatGoogleGenerativeAI(model=GEMINI_MODEL, temperature=0)
+    # config.GEMINI_MODEL, not a from-import: `crew run --model` rebinds it at runtime.
+    llm = ChatGoogleGenerativeAI(model=config.GEMINI_MODEL, temperature=0)
     response = llm.invoke(
         _DISTILL_PROMPT.format(source_task=source_task, review_feedback=review_feedback)
     )
