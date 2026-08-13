@@ -1,0 +1,11 @@
+[project]
+name = "demo-target"
+version = "0.1.0"
+description = "Seeded demo fixture the Repo Brain crew operates on"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
